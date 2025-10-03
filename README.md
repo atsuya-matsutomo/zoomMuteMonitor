@@ -1,4 +1,12 @@
 # Zoomマイク監視ツール
+ <table>
+    <tr>
+      <td><img width="960" alt="image1"
+  src="https://github.com/user-attachments/assets/c7b67c87-d30f-4b4d-bce5-88e3178caf01" /></td>
+      <td><img width="960" alt="image2"
+  src="https://github.com/user-attachments/assets/71906bde-80f8-438e-9384-f1ec2720e6f5" /></td>
+    </tr>
+  </table>
 
 Zoomのマイクミュート状態を画面上にリアルタイム表示するmacOS用ツールです。
 
@@ -24,8 +32,11 @@ Zoomのマイクミュート状態を画面上にリアルタイム表示するm
 
 1. [Releases](../../releases)ページから最新版の `ZoomMuteMonitor.app.zip` をダウンロード
 2. ダウンロードしたZIPファイルを解凍（ダブルクリック）
-3. 解凍された `ZoomMuteMonitor.app` を `Applications` フォルダにドラッグ＆ドロップ
-4. `Applications` フォルダから `ZoomMuteMonitor.app` を起動
+3. `ZoomMuteMonitor.app` を起動
+4. 初回のみ、権限の許可が必要です
+
+ <img width="456" height="484" alt="image" src="https://github.com/user-attachments/assets/06401528-540a-4a70-b03a-e8182940b1ea" /> 
+
 5. 初回起動時、アクセシビリティ権限を許可してください
 
 ## 方法2: スタートアップコマンドを使用

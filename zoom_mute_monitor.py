@@ -261,6 +261,18 @@ class MuteStatusView(NSView):
 
         menu.addItem_(NSMenuItem.separatorItem())
 
+        # ログイン時に自動起動
+        is_login_item = self.monitor.isLoginItem()
+        login_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "ログイン時に自動起動" + (" ✓" if is_login_item else ""),
+            "toggleLoginItem:",
+            ""
+        )
+        login_item.setTarget_(self.monitor)
+        menu.addItem_(login_item)
+
+        menu.addItem_(NSMenuItem.separatorItem())
+
         # バージョン表示
         version_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
             "ver 1.0.0",
@@ -491,6 +503,102 @@ return "unknown"
             'open',
             'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'
         ])
+
+    def isLoginItem(self):
+        """ログイン項目に登録されているかチェック"""
+        try:
+            # アプリのパスを取得
+            if getattr(sys, 'frozen', False):
+                # .appとして実行されている場合
+                app_path = os.path.dirname(os.path.dirname(os.path.dirname(sys.executable)))
+            else:
+                # スクリプトとして実行されている場合は機能しない
+                return False
+
+            # osascriptでログイン項目をチェック
+            script = f'''
+tell application "System Events"
+    get the name of every login item
+end tell
+'''
+            applescript = NSAppleScript.alloc().initWithSource_(script)
+            result, error = applescript.executeAndReturnError_(None)
+
+            if error or not result:
+                return False
+
+            login_items = str(result.stringValue())
+            # ZoomMuteMonitorが含まれているかチェック
+            return "ZoomMuteMonitor" in login_items
+        except:
+            return False
+
+    def toggleLoginItem_(self, sender):
+        """ログイン項目の登録/解除を切り替え"""
+        try:
+            # アプリのパスを取得
+            if getattr(sys, 'frozen', False):
+                # .appとして実行されている場合
+                app_path = os.path.dirname(os.path.dirname(os.path.dirname(sys.executable)))
+            else:
+                # スクリプトとして実行されている場合
+                alert = NSAlert.alloc().init()
+                alert.setMessageText_("エラー")
+                alert.setInformativeText_("この機能は.appとしてビルドされた場合のみ利用可能です。")
+                alert.addButtonWithTitle_("OK")
+                alert.runModal()
+                return
+
+            if self.isLoginItem():
+                # 登録解除
+                script = '''
+tell application "System Events"
+    delete login item "ZoomMuteMonitor"
+end tell
+'''
+                applescript = NSAppleScript.alloc().initWithSource_(script)
+                result, error = applescript.executeAndReturnError_(None)
+
+                if error:
+                    alert = NSAlert.alloc().init()
+                    alert.setMessageText_("エラー")
+                    alert.setInformativeText_("ログイン項目の解除に失敗しました。")
+                    alert.addButtonWithTitle_("OK")
+                    alert.runModal()
+                else:
+                    alert = NSAlert.alloc().init()
+                    alert.setMessageText_("成功")
+                    alert.setInformativeText_("ログイン時の自動起動を解除しました。")
+                    alert.addButtonWithTitle_("OK")
+                    alert.runModal()
+            else:
+                # 登録
+                script = f'''
+tell application "System Events"
+    make login item at end with properties {{path:"{app_path}", hidden:false}}
+end tell
+'''
+                applescript = NSAppleScript.alloc().initWithSource_(script)
+                result, error = applescript.executeAndReturnError_(None)
+
+                if error:
+                    alert = NSAlert.alloc().init()
+                    alert.setMessageText_("エラー")
+                    alert.setInformativeText_("ログイン項目の登録に失敗しました。")
+                    alert.addButtonWithTitle_("OK")
+                    alert.runModal()
+                else:
+                    alert = NSAlert.alloc().init()
+                    alert.setMessageText_("成功")
+                    alert.setInformativeText_("ログイン時に自動起動するように設定しました。")
+                    alert.addButtonWithTitle_("OK")
+                    alert.runModal()
+        except Exception as e:
+            alert = NSAlert.alloc().init()
+            alert.setMessageText_("エラー")
+            alert.setInformativeText_(f"予期しないエラー: {str(e)}")
+            alert.addButtonWithTitle_("OK")
+            alert.runModal()
 
     def setMutedKeyword_(self, sender):
         """ミュート検知キーワードを設定"""

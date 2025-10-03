@@ -48,6 +48,7 @@ class Config:
         self.muted_keyword = "オーディオのミュート解除"
         self.unmuted_keyword = "オーディオのミュート"
         self.check_interval = 200  # ミリ秒
+        self.opacity = 50  # 透過度（10〜100%）
         self.load()
 
     def load(self):
@@ -62,6 +63,7 @@ class Config:
                     self.muted_keyword = data.get('muted_keyword', "オーディオのミュート解除")
                     self.unmuted_keyword = data.get('unmuted_keyword', "オーディオのミュート")
                     self.check_interval = data.get('check_interval', 200)
+                    self.opacity = data.get('opacity', 50)
         except Exception as e:
             print(f"Failed to load config: {e}")
 
@@ -76,7 +78,8 @@ class Config:
                     'icon_size': self.icon_size,
                     'muted_keyword': self.muted_keyword,
                     'unmuted_keyword': self.unmuted_keyword,
-                    'check_interval': self.check_interval
+                    'check_interval': self.check_interval,
+                    'opacity': self.opacity
                 }, f, indent=2)
         except Exception as e:
             print(f"Failed to save config: {e}")
@@ -127,6 +130,9 @@ class MuteStatusView(NSView):
             new_size = NSMakeSize(self.monitor.config.icon_size, self.monitor.config.icon_size)
             image.setSize_(new_size)
             self.imageView.setImage_(image)
+
+            # 透過度を設定
+            self.imageView.setAlphaValue_(self.monitor.config.opacity / 100.0)
 
     def updateIconSize_(self, size):
         """アイコンサイズを更新"""
@@ -219,6 +225,25 @@ class MuteStatusView(NSView):
         interval_item.setSubmenu_(interval_menu)
         menu.addItem_(interval_item)
 
+        # 透過度設定
+        opacity_menu = NSMenu.alloc().init()
+        for opacity in [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]:
+            label = f"{opacity}%" + (" ✓" if opacity == self.monitor.config.opacity else "")
+            item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+                label,
+                "setOpacity:",
+                ""
+            )
+            item.setTag_(opacity)
+            item.setTarget_(self.monitor)
+            opacity_menu.addItem_(item)
+
+        opacity_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "透過度", None, ""
+        )
+        opacity_item.setSubmenu_(opacity_menu)
+        menu.addItem_(opacity_item)
+
         menu.addItem_(NSMenuItem.separatorItem())
 
         # キーワード設定
@@ -275,7 +300,7 @@ class MuteStatusView(NSView):
 
         # バージョン表示
         version_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
-            "ver 1.0.0",
+            "ver 1.0.1",
             None,
             ""
         )
@@ -483,6 +508,15 @@ return "unknown"
             None,
             True
         )
+
+    def setOpacity_(self, sender):
+        """透過度を変更"""
+        opacity = sender.tag()
+        self.config.opacity = opacity
+        self.config.save()
+
+        # 現在の状態を再描画して透過度を反映
+        self.view.imageView.setAlphaValue_(opacity / 100.0)
 
     def showError_(self, sender):
         """エラー情報を表示"""

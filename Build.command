@@ -51,8 +51,8 @@ OPTIONS = {
         'CFBundleName': 'ZoomMuteMonitor',
         'CFBundleDisplayName': 'ZoomMuteMonitor',
         'CFBundleIdentifier': 'com.zoommutemonitor.app',
-        'CFBundleVersion': '1.0.0',
-        'CFBundleShortVersionString': '1.0.0',
+        'CFBundleVersion': '1.0.1',
+        'CFBundleShortVersionString': '1.0.1',
         'LSUIElement': True,  # Dockに表示しない
         'NSHighResolutionCapable': True,
         'NSAppleEventsUsageDescription': 'ZoomMuteMonitorはZoomのミュート状態を監視するために、System Eventsへのアクセスが必要です。',

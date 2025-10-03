@@ -48,13 +48,14 @@ OPTIONS = {
     'argv_emulation': False,
     'iconfile': 'icon/icon-200.png',
     'plist': {
-        'CFBundleName': 'Zoomマイク監視ツール',
-        'CFBundleDisplayName': 'Zoomマイク監視ツール',
-        'CFBundleIdentifier': 'com.zoommonitor.app',
+        'CFBundleName': 'ZoomMuteMonitor',
+        'CFBundleDisplayName': 'ZoomMuteMonitor',
+        'CFBundleIdentifier': 'com.zoommutemonitor.app',
         'CFBundleVersion': '1.0.0',
         'CFBundleShortVersionString': '1.0.0',
         'LSUIElement': True,  # Dockに表示しない
         'NSHighResolutionCapable': True,
+        'NSAppleEventsUsageDescription': 'ZoomMuteMonitorはZoomのミュート状態を監視するために、System Eventsへのアクセスが必要です。',
     },
     'packages': ['objc', 'Foundation', 'AppKit', 'Cocoa'],
     'includes': ['subprocess', 'json', 'os'],
@@ -92,7 +93,7 @@ python3 setup.py py2app
 echo ""
 
 # 自己署名証明書を確認・作成
-CERT_NAME="ZoomMonitorAppSigner"
+CERT_NAME="ZoomMuteMonitorAppSigner"
 if ! security find-certificate -c "$CERT_NAME" >/dev/null 2>&1; then
     echo "📝 自己署名証明書を作成中..."
     # 証明書作成のためのテンポラリファイル
@@ -110,7 +111,7 @@ extendedKeyUsage = codeSigning
 EOF
 
     # 証明書と秘密鍵を作成
-    openssl req -x509 -newkey rsa:4096 -keyout /tmp/cert_key.pem -out /tmp/cert.pem -days 3650 -nodes -subj "/CN=ZoomMonitorAppSigner" -config /tmp/cert_config.txt
+    openssl req -x509 -newkey rsa:4096 -keyout /tmp/cert_key.pem -out /tmp/cert.pem -days 3650 -nodes -subj "/CN=ZoomMuteMonitorAppSigner" -config /tmp/cert_config.txt
 
     # PKCS12形式に変換（パスワードなし）
     openssl pkcs12 -export -out /tmp/cert.p12 -inkey /tmp/cert_key.pem -in /tmp/cert.pem -passout pass:temporary
@@ -130,22 +131,22 @@ fi
 
 # コード署名（entitlementsを明示的に指定）
 echo "✍️  コード署名中..."
-codesign --force --deep --sign "$CERT_NAME" --entitlements entitlements.plist "dist/Zoomマイク監視ツール.app"
+codesign --force --deep --sign "$CERT_NAME" --entitlements entitlements.plist "dist/ZoomMuteMonitor.app"
 echo ""
 
-if [ -d "dist/Zoomマイク監視ツール.app" ]; then
+if [ -d "dist/ZoomMuteMonitor.app" ]; then
     echo "✅ ビルド成功！"
     echo ""
 
     # Applicationsフォルダに移動
     echo "📦 Applicationsフォルダに更新中..."
-    APP_NAME="Zoomマイク監視ツール.app"
+    APP_NAME="ZoomMuteMonitor.app"
 
     # 既存のアプリがある場合は、中身を置き換える（権限を保持）
     if [ -d "/Applications/$APP_NAME" ]; then
         echo "既存アプリの内容を更新中..."
         # 既存アプリを終了
-        osascript -e 'tell application "Zoomマイク監視ツール" to quit' 2>/dev/null || true
+        osascript -e 'tell application "ZoomMuteMonitor" to quit' 2>/dev/null || true
         sleep 1
 
         # 中身を置き換え

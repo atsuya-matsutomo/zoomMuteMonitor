@@ -574,7 +574,7 @@ def main():
     from Foundation import NSBundle
     info = NSBundle.mainBundle().infoDictionary()
     if info:
-        info["CFBundleName"] = "Zoomマイク監視ツール"
+        info["CFBundleName"] = "ZoomMuteMonitor"
 
     monitor = ZoomMuteMonitor.alloc().init()
     monitor.startMonitoring()

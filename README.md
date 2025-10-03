@@ -32,8 +32,11 @@ Zoomのマイクミュート状態を画面上にリアルタイム表示するm
 
 1. [Releases](../../releases)ページから最新版の `ZoomMuteMonitor.app.zip` をダウンロード
 2. ダウンロードしたZIPファイルを解凍（ダブルクリック）
-3. 解凍された `ZoomMuteMonitor.app` を `Applications` フォルダにドラッグ＆ドロップ
-4. `Applications` フォルダから `ZoomMuteMonitor.app` を起動
+3. `ZoomMuteMonitor.app` を起動
+4. 初回のみ、権限の許可が必要です
+
+ <img width="456" height="484" alt="image" src="https://github.com/user-attachments/assets/06401528-540a-4a70-b03a-e8182940b1ea" /> 
+
 5. 初回起動時、アクセシビリティ権限を許可してください
 
 ## 方法2: スタートアップコマンドを使用

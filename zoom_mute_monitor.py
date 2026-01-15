@@ -14,7 +14,7 @@ from AppKit import (
     NSFont, NSBackingStoreBuffered, NSWindowStyleMaskBorderless,
     NSScreen, NSMakeRect, NSMenu, NSMenuItem, NSAlert, NSAlertFirstButtonReturn,
     NSImage, NSImageView, NSCompositingOperationSourceOver, NSMakeSize, NSAppleScript,
-    NSEvent
+    NSEvent, NSStatusBar, NSVariableStatusItemLength
 )
 from Cocoa import (
     NSWindowCollectionBehaviorCanJoinAllSpaces,
@@ -49,6 +49,8 @@ class Config:
         self.unmuted_keyword = "オーディオのミュート"
         self.check_interval = 200  # ミリ秒
         self.opacity = 50  # 透過度（10〜100%）
+        self.click_through = False  # クリック透過
+        self.hide_unknown = False  # ?のとき非表示
         self.load()
 
     def load(self):
@@ -64,6 +66,8 @@ class Config:
                     self.unmuted_keyword = data.get('unmuted_keyword', "オーディオのミュート")
                     self.check_interval = data.get('check_interval', 200)
                     self.opacity = data.get('opacity', 50)
+                    self.click_through = data.get('click_through', False)
+                    self.hide_unknown = data.get('hide_unknown', False)
         except Exception as e:
             print(f"Failed to load config: {e}")
 
@@ -79,7 +83,9 @@ class Config:
                     'muted_keyword': self.muted_keyword,
                     'unmuted_keyword': self.unmuted_keyword,
                     'check_interval': self.check_interval,
-                    'opacity': self.opacity
+                    'opacity': self.opacity,
+                    'click_through': self.click_through,
+                    'hide_unknown': self.hide_unknown
                 }, f, indent=2)
         except Exception as e:
             print(f"Failed to save config: {e}")
@@ -339,6 +345,7 @@ class ZoomMuteMonitor(NSObject):
         self.timer = None
         self.config = Config()
         self.last_error = None  # 最後のエラー情報を保存
+        self.status_item = None  # メニューバーアイテム
 
         return self
 
@@ -373,7 +380,7 @@ class ZoomMuteMonitor(NSObject):
         self.window.setOpaque_(False)
         self.window.setBackgroundColor_(NSColor.clearColor())
         self.window.setLevel_(NSFloatingWindowLevel)  # 常に最前面
-        self.window.setIgnoresMouseEvents_(False)  # マウスイベントを受け取る
+        self.window.setIgnoresMouseEvents_(self.config.click_through)  # クリック透過設定に従う
         self.window.setCollectionBehavior_(
             NSWindowCollectionBehaviorCanJoinAllSpaces |
             NSWindowCollectionBehaviorStationary
@@ -484,6 +491,14 @@ return "unknown"
         """定期的に呼ばれてステータスを更新"""
         is_muted = self.checkMuteStatus()
         self.view.updateStatus_(is_muted)
+        self.updateStatusBarIcon_(is_muted)  # メニューバーアイコンも更新
+
+        # ?のとき非表示が有効で、unknown状態の場合はウィンドウを隠す
+        if self.window:
+            if self.config.hide_unknown and is_muted is None:
+                self.window.orderOut_(None)
+            else:
+                self.window.orderFront_(None)
 
     def setIconSize_(self, sender):
         """アイコンサイズを変更"""
@@ -517,6 +532,26 @@ return "unknown"
 
         # 現在の状態を再描画して透過度を反映
         self.view.imageView.setAlphaValue_(opacity / 100.0)
+
+    def toggleClickThrough_(self, sender):
+        """クリック透過を切り替え"""
+        self.config.click_through = not self.config.click_through
+        self.config.save()
+
+        # ウィンドウのマウスイベント設定を更新
+        if self.window:
+            self.window.setIgnoresMouseEvents_(self.config.click_through)
+
+        # メニューを再作成して状態を反映
+        self.createStatusBarMenu()
+
+    def toggleHideUnknown_(self, sender):
+        """?のとき非表示を切り替え"""
+        self.config.hide_unknown = not self.config.hide_unknown
+        self.config.save()
+
+        # メニューを再作成して状態を反映
+        self.createStatusBarMenu()
 
     def showError_(self, sender):
         """エラー情報を表示"""
@@ -690,8 +725,202 @@ end tell
                 self.config.unmuted_keyword = new_keyword
                 self.config.save()
 
+    def setupStatusBar(self):
+        """メニューバーにステータスアイテムを作成"""
+        self.status_item = NSStatusBar.systemStatusBar().statusItemWithLength_(NSVariableStatusItemLength)
+
+        # 初期アイコンを設定（unknown状態）
+        icon_path = os.path.join(ICON_DIR, "unknown-512.png")
+        if os.path.exists(icon_path):
+            icon = NSImage.alloc().initWithContentsOfFile_(icon_path)
+            if icon:
+                # メニューバー用にサイズ調整（18x18が標準）
+                icon.setSize_(NSMakeSize(18, 18))
+                icon.setTemplate_(True)  # ダークモード対応
+                self.status_item.button().setImage_(icon)
+
+        # メニューを作成
+        self.createStatusBarMenu()
+
+    def createStatusBarMenu(self):
+        """ステータスバーのメニューを作成"""
+        menu = NSMenu.alloc().init()
+
+        # アイコンサイズ設定（50px単位で500pxまで）
+        size_menu = NSMenu.alloc().init()
+        for size in [50, 100, 150, 200, 250, 300, 350, 400, 450, 500]:
+            item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+                f"{size}px" + (" ✓" if size == self.config.icon_size else ""),
+                "setIconSize:",
+                ""
+            )
+            item.setTag_(size)
+            item.setTarget_(self)
+            size_menu.addItem_(item)
+
+        size_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "アイコンサイズ", None, ""
+        )
+        size_item.setSubmenu_(size_menu)
+        menu.addItem_(size_item)
+
+        # 監視間隔設定
+        interval_menu = NSMenu.alloc().init()
+        for interval in [10, 30, 50, 100, 200, 300, 500, 1000]:
+            label = f"{interval}ms" + (" ✓" if interval == self.config.check_interval else "")
+            item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+                label,
+                "setCheckInterval:",
+                ""
+            )
+            item.setTag_(interval)
+            item.setTarget_(self)
+            interval_menu.addItem_(item)
+
+        interval_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "監視間隔", None, ""
+        )
+        interval_item.setSubmenu_(interval_menu)
+        menu.addItem_(interval_item)
+
+        # 透過度設定
+        opacity_menu = NSMenu.alloc().init()
+        for opacity in [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]:
+            label = f"{opacity}%" + (" ✓" if opacity == self.config.opacity else "")
+            item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+                label,
+                "setOpacity:",
+                ""
+            )
+            item.setTag_(opacity)
+            item.setTarget_(self)
+            opacity_menu.addItem_(item)
+
+        opacity_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "透過度", None, ""
+        )
+        opacity_item.setSubmenu_(opacity_menu)
+        menu.addItem_(opacity_item)
+
+        menu.addItem_(NSMenuItem.separatorItem())
+
+        # クリック透過設定
+        click_through_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "クリック透過" + (" ✓" if self.config.click_through else ""),
+            "toggleClickThrough:",
+            ""
+        )
+        click_through_item.setTarget_(self)
+        menu.addItem_(click_through_item)
+
+        # ?のとき非表示設定
+        hide_unknown_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "?のとき非表示" + (" ✓" if self.config.hide_unknown else ""),
+            "toggleHideUnknown:",
+            ""
+        )
+        hide_unknown_item.setTarget_(self)
+        menu.addItem_(hide_unknown_item)
+
+        menu.addItem_(NSMenuItem.separatorItem())
+
+        # キーワード設定
+        muted_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "ミュート検知キーワード設定...",
+            "setMutedKeyword:",
+            ""
+        )
+        muted_item.setTarget_(self)
+        menu.addItem_(muted_item)
+
+        unmuted_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "ミュート解除検知キーワード設定...",
+            "setUnmutedKeyword:",
+            ""
+        )
+        unmuted_item.setTarget_(self)
+        menu.addItem_(unmuted_item)
+
+        menu.addItem_(NSMenuItem.separatorItem())
+
+        # エラー表示（unknown状態の時のみ表示するが、常に追加しておく）
+        error_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "エラー表示",
+            "showError:",
+            ""
+        )
+        error_item.setTarget_(self)
+        menu.addItem_(error_item)
+
+        # アクセシビリティ設定を開く
+        accessibility_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "アクセシビリティ設定を開く",
+            "openAccessibilitySettings:",
+            ""
+        )
+        accessibility_item.setTarget_(self)
+        menu.addItem_(accessibility_item)
+
+        menu.addItem_(NSMenuItem.separatorItem())
+
+        # ログイン時に自動起動
+        is_login_item = self.isLoginItem()
+        login_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "ログイン時に自動起動" + (" ✓" if is_login_item else ""),
+            "toggleLoginItem:",
+            ""
+        )
+        login_item.setTarget_(self)
+        menu.addItem_(login_item)
+
+        menu.addItem_(NSMenuItem.separatorItem())
+
+        # バージョン表示
+        version_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "ver 1.0.1",
+            None,
+            ""
+        )
+        version_item.setEnabled_(False)
+        menu.addItem_(version_item)
+
+        menu.addItem_(NSMenuItem.separatorItem())
+
+        # 終了
+        quit_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "終了",
+            "terminate:",
+            "q"
+        )
+        quit_item.setTarget_(NSApplication.sharedApplication())
+        menu.addItem_(quit_item)
+
+        self.status_item.setMenu_(menu)
+
+    def updateStatusBarIcon_(self, is_muted):
+        """メニューバーアイコンを更新"""
+        if self.status_item is None:
+            return
+
+        # 状態に応じてアイコンファイルを選択
+        if is_muted is None:
+            icon_path = os.path.join(ICON_DIR, "unknown-512.png")
+        elif is_muted:
+            icon_path = os.path.join(ICON_DIR, "micOff-512.png")
+        else:
+            icon_path = os.path.join(ICON_DIR, "micOn-512.png")
+
+        if os.path.exists(icon_path):
+            icon = NSImage.alloc().initWithContentsOfFile_(icon_path)
+            if icon:
+                icon.setSize_(NSMakeSize(18, 18))
+                # テンプレートモードはミュート状態の時のみ無効（色を見せるため）
+                icon.setTemplate_(is_muted is None)
+                self.status_item.button().setImage_(icon)
+
     def startMonitoring(self):
         """監視を開始"""
+        self.setupStatusBar()  # メニューバーアイテムを設定
         self.setupWindow()
 
         # 設定された間隔でチェック

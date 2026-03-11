@@ -506,6 +506,7 @@ return "unknown"
         self.config.icon_size = size
         self.config.save()
         self.view.updateIconSize_(size)
+        self.createStatusBarMenu()
 
     def setCheckInterval_(self, sender):
         """監視間隔を変更"""
@@ -523,6 +524,7 @@ return "unknown"
             None,
             True
         )
+        self.createStatusBarMenu()
 
     def setOpacity_(self, sender):
         """透過度を変更"""
@@ -532,6 +534,7 @@ return "unknown"
 
         # 現在の状態を再描画して透過度を反映
         self.view.imageView.setAlphaValue_(opacity / 100.0)
+        self.createStatusBarMenu()
 
     def toggleClickThrough_(self, sender):
         """クリック透過を切り替え"""
